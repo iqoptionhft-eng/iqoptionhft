@@ -42,7 +42,8 @@
         <button id="btn-real" class="btn danger">Real</button>
       </div>
       <input id="confirm-real" placeholder="Para REAL, digite REAL aqui" />
-      <p class="hint">A conta real só ativa se você confirmar. Comece sempre na prática.</p>
+      <p class="hint">A conta real só ativa se você confirmar, com o motor parado, sem ordens abertas e com ALLOW_REAL=1 no .env. Comece sempre na prática.</p>
+      <p id="real-lock" class="hint"></p>
       <div class="row">
         <button id="btn-connect" class="btn">Conectar</button>
         <button id="btn-start" class="btn primary">Iniciar</button>
@@ -56,13 +57,18 @@
       <label>Valor por ordem</label>
       <input id="amount" type="number" step="0.5" min="1" value="2" />
       <label>Duração (min)</label>
-      <input id="duration" type="number" min="1" max="5" value="1" />
+      <select id="duration">
+        <option value="1">1 minuto</option>
+        <option value="5">5 minutos</option>
+      </select>
       <label>Payout mínimo %</label>
       <input id="payout" type="number" min="50" max="100" value="80" />
       <label>Confiança mínima</label>
       <input id="conf" type="number" step="0.01" min="0.5" max="0.99" value="0.72" />
       <label>Perda máxima do dia</label>
       <input id="maxloss" type="number" min="1" value="40" />
+      <label>Perdas seguidas para pausar</label>
+      <input id="maxconsec" type="number" min="1" max="10" value="3" />
       <label>Ativos (vírgula)</label>
       <input id="assets" value="EURUSD-OTC,GBPUSD-OTC,EURGBP-OTC,USDJPY-OTC,AUDUSD-OTC" />
       <label>Modelo complexo (Gemma 31B)</label>

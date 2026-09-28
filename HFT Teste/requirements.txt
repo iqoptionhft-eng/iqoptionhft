@@ -8,4 +8,6 @@ numpy==2.2.1
 websocket-client==1.8.0
 requests==2.32.3
 fake-useragent==2.2.0
-iqbroker @ https://github.com/zagmi/iqbroker/archive/refs/heads/main.zip
+# A5: lib nao oficial fixada num commit especifico (imutavel). Revise o diff antes de atualizar o hash.
+# zagmi/iqbroker @ 3b64d274199f9b8c4014200f3626d1c8854dcdba (2025-11-26)
+iqbroker @ https://github.com/zagmi/iqbroker/archive/3b64d274199f9b8c4014200f3626d1c8854dcdba.zip

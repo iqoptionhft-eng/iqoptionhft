@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from .config import get_settings
-from .memory import ExperienceMemory, memory as default_memory
+from .memory import ExperienceMemory, get_memory
 from .models import Direction, Features
 
 SYSTEM = (
@@ -25,7 +25,7 @@ class OllamaBrain:
         self.host = s.ollama_host.rstrip("/")
         self.model = s.ollama_model
         self.fast_model = ""
-        self.memory = store or default_memory
+        self.memory = store or get_memory()
         self.last_models: list[str] = []
 
     def set_models(self, complex_model: str, fast_model: str = "") -> None:
@@ -55,18 +55,29 @@ class OllamaBrain:
         except Exception as exc:
             return False, str(exc), []
 
+    def _generate(self, body: dict[str, Any], timeout: float) -> httpx.Response:
+        """POST /api/generate com raciocinio desligado.
+
+        Modelos com "thinking" (ex.: gemma4) gastam todo o num_predict pensando e devolvem
+        `response` vazio; com think=false respondem o JSON direto. Se o Ollama/modelo nao
+        aceitar o campo, repete sem ele.
+        """
+        r = httpx.post(f"{self.host}/api/generate", json={**body, "think": False}, timeout=timeout)
+        if r.status_code == 400 and "think" in r.text.lower():
+            r = httpx.post(f"{self.host}/api/generate", json=body, timeout=timeout)
+        return r
+
     def warmup(self, model: str | None = None) -> None:
         try:
-            httpx.post(
-                f"{self.host}/api/generate",
-                json={
+            self._generate(
+                {
                     "model": model or self.model,
                     "prompt": "ok",
                     "stream": False,
                     "keep_alive": "30m",
                     "options": {"num_predict": 1, "temperature": 0},
                 },
-                timeout=60.0,
+                60.0,
             )
         except Exception:
             pass
@@ -129,9 +140,8 @@ class OllamaBrain:
             "Se o historico mostrar que RSI/tendencia iguais geraram LOSS, responda skip."
         )
         try:
-            r = httpx.post(
-                f"{self.host}/api/generate",
-                json={
+            r = self._generate(
+                {
                     "model": model,
                     "prompt": prompt,
                     "system": SYSTEM,
@@ -144,7 +154,7 @@ class OllamaBrain:
                         "num_ctx": 3072,
                     },
                 },
-                timeout=timeout,
+                timeout,
             )
             r.raise_for_status()
             text = r.json().get("response", "")
