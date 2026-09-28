@@ -3,19 +3,21 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 AccountMode = Literal["PRACTICE", "REAL"]
 Direction = Literal["call", "put"]
-EngineStatus = Literal["idle", "connecting", "running", "paused", "error"]
+EngineStatus = Literal["idle", "connecting", "starting", "running", "stopping", "paused", "error"]
 FallbackMode = Literal["ta_pure", "safe", "skip"]
 LlmOutcome = Literal["agree", "reject", "skip", "timeout", "error", "unused"]
+# M4: opcoes digitais da IQ Option so aceitam 1 e 5 minutos neste robo.
+DurationMin = Literal[1, 5]
 
 
 class BotSettings(BaseModel):
-    account: AccountMode = "PRACTICE"
+    # Conhecido #1: a conta NAO faz parte dos parametros; so muda por /api/account.
     amount: float = Field(default=2.0, ge=1.0, le=10000.0)
-    duration_min: int = Field(default=1, ge=1, le=5)
+    duration_min: DurationMin = 1
     assets: list[str] = Field(
         default_factory=lambda: [
             "EURUSD-OTC",
@@ -36,10 +38,21 @@ class BotSettings(BaseModel):
     memory_enabled: bool = True
     poll_interval_sec: float = Field(default=0.35, ge=0.15, le=2.0)
     max_open_trades: int = Field(default=1, ge=1, le=5)
-    max_daily_loss: float = Field(default=40.0, ge=1.0)
+    max_daily_loss: float = Field(default=40.0, ge=1.0, le=10000.0)
     max_consecutive_losses: int = Field(default=3, ge=1, le=10)
-    cooldown_sec: float = Field(default=8.0, ge=0.0)
+    cooldown_sec: float = Field(default=8.0, ge=0.0, le=3600.0)
     enter_last_seconds: int = Field(default=8, ge=3, le=20)
+    # M1: tempo minimo restante no candle para ainda enviar a ordem.
+    min_seconds_left: float = Field(default=1.5, ge=0.5, le=10.0)
+
+    @model_validator(mode="after")
+    def _amount_within_loss(self) -> "BotSettings":
+        # A4: uma unica ordem nunca pode ser maior que a perda maxima do dia.
+        if self.amount > self.max_daily_loss:
+            raise ValueError(
+                f"amount ({self.amount}) nao pode ser maior que max_daily_loss ({self.max_daily_loss})"
+            )
+        return self
 
 
 class Candle(BaseModel):
@@ -89,11 +102,15 @@ class Signal(BaseModel):
 
 class TradeRecord(BaseModel):
     id: str
+    order_id: int | None = None
+    account: AccountMode = "PRACTICE"
     asset: str
     direction: Direction
     amount: float
     payout: float
+    duration_min: int = 1
     opened_at: datetime
+    expires_at: float = 0.0
     closed_at: datetime | None = None
     result: Literal["WIN", "LOSS", "EQUAL", "OPEN", "ERROR"] = "OPEN"
     profit: float = 0.0
@@ -152,6 +169,7 @@ class HealthStatus(BaseModel):
     models: list[str] = Field(default_factory=list)
     checked_at: datetime | None = None
     ready_to_trade: bool = False
+    engine_heartbeat_age_sec: float | None = None
 
 
 class MemoryStats(BaseModel):
@@ -174,16 +192,32 @@ class BacktestResult(BaseModel):
     taken: int = 0
     wins: int = 0
     losses: int = 0
+    equals: int = 0
     win_rate: float = 0.0
+    payout: float = 0.0
+    breakeven_win_rate: float = 0.0
+    expected_value_per_unit: float = 0.0
     skipped_memory: int = 0
     notes: list[str] = Field(default_factory=list)
+
+
+class DayCounters(BaseModel):
+    account: AccountMode = "PRACTICE"
+    date: str = ""
+    profit: float = 0.0
+    wins: int = 0
+    losses: int = 0
+    equals: int = 0
+    errors: int = 0
+    consecutive_losses: int = 0
 
 
 class RuntimeState(BaseModel):
     status: EngineStatus = "idle"
     connected: bool = False
     account: AccountMode = "PRACTICE"
-    email: str = ""
+    allow_real: bool = False
+    email_masked: str = ""
     balance: float = 0.0
     currency: str = "USD"
     ollama_ok: bool = False
@@ -192,9 +226,13 @@ class RuntimeState(BaseModel):
     wins: int = 0
     losses: int = 0
     equals: int = 0
+    errors: int = 0
     profit_today: float = 0.0
+    trading_date: str = ""
     consecutive_losses: int = 0
     open_trades: int = 0
+    open_exposure: float = 0.0
+    uncertain_orders: int = 0
     last_signal: str = ""
     settings: BotSettings = Field(default_factory=BotSettings)
     trades: list[TradeRecord] = Field(default_factory=list)

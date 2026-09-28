@@ -162,5 +162,29 @@ def seconds_to_next_minute(now_ts: float) -> float:
     return 60.0 - (now_ts % 60.0)
 
 
+def ta_confidence(score: float) -> float:
+    """Confianca derivada so da TA (mesma regra no motor ao vivo e no backtest)."""
+    return min(0.93, 0.5 + abs(score) * 0.55)
+
+
+def expected_expiry(server_ts: float, duration_min: int) -> float:
+    """Replica a regra de expiracao do iqbroker (buy_digital_spot_v2) para saber quando apurar.
+
+    duration 1: proxima virada de minuto se faltar >30s, senao a seguinte.
+    duration 5: primeiro minuto multiplo de 5 a partir de agora+1m30s com >30s de folga.
+    """
+    ts = int(server_ts)
+    if duration_min == 1:
+        base = ts - ts % 60
+        nxt = base + 60
+        return float(nxt if nxt - ts > 30 else nxt + 60)
+    t = ts + 90
+    t = t - t % 60
+    while True:
+        if (t // 60) % duration_min == 0 and t - ts > 30:
+            return float(t)
+        t += 60
+
+
 def is_finite_number(v: float) -> bool:
     return math.isfinite(v)

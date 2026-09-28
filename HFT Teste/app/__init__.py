@@ -1,5 +1,1 @@
-from app.engine import engine
-
-if __name__ == "__main__":
-    engine.iq  # noqa: B018
-    print("Use: python run.py  (interface web)")
+"""HFT IQ Option + Gemma. Use `python run.py` para subir o painel."""

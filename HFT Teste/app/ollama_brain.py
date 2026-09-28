@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from .config import get_settings
-from .memory import ExperienceMemory, memory as default_memory
+from .memory import ExperienceMemory, get_memory
 from .models import Direction, Features
 
 SYSTEM = (
@@ -25,7 +25,7 @@ class OllamaBrain:
         self.host = s.ollama_host.rstrip("/")
         self.model = s.ollama_model
         self.fast_model = ""
-        self.memory = store or default_memory
+        self.memory = store or get_memory()
         self.last_models: list[str] = []
 
     def set_models(self, complex_model: str, fast_model: str = "") -> None:
